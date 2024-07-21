@@ -8,7 +8,7 @@ const frappeDateFormatter = frappe.form.formatters.Date;
 const frappeDatetimeFormatter = frappe.form.formatters.Datetime;
 
 function getISMCalendar() {
-        return $.calendars.instance('islamic', 'en_US');
+        return $.calendars.instance('persian', 'en_US');
     }
 
 function ad2ism(m, type, dateFormat = ISM_DATE_FORMAT) {
@@ -270,7 +270,7 @@ frappe.ui.form.ControlDatetime = class CustomControlDateDate extends frappe.ui.f
             prevText: 'Prev',
             nextText: 'Next',
             todayText: 'Today',
-            clearText: 'Clear',
+            i: 'Clear',
             closeText: 'Close',
             onShow: function(picker) {
                 $(picker).find('.calendars-cmd-today').on('click', function() {
