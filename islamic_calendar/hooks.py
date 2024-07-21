@@ -1,8 +1,8 @@
 app_name = "islamic_calendar"
 app_title = "Islamic Calendar"
-app_publisher = "KanakInfosystems LLP."
+app_publisher = "aogc LLP."
 app_description = "Islamic Calendar"
-app_email = "info@kanakinfosystems.com"
+app_email = "info@aogc.com"
 app_license = "mit"
 # required_apps = []
 
