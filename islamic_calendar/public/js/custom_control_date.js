@@ -8,7 +8,7 @@ const frappeDateFormatter = frappe.form.formatters.Date;
 const frappeDatetimeFormatter = frappe.form.formatters.Datetime;
 
 function getISMCalendar() {
-        return $.calendars.instance('persian', 'en_US');
+        return $.calendars.instance('iranian', 'en_US');
     }
 
 function ad2ism(m, type, dateFormat = ISM_DATE_FORMAT) {

@@ -11,7 +11,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 app_include_css = [
-                "/assets/islamic_calendar/hijri_libary/jquery.calendars.picker.css",
+                "/assets/islamic_calendar/islamic_lib/jquery.calendars.picker.css",
                 "/assets/islamic_calendar/css/islamic_calendar.css"]
 app_include_js = [
                 "islamic_assets.bundle.js"

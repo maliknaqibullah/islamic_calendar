@@ -10,9 +10,9 @@
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
-      for (let key of __getOwnPropNames(from))
-        if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      for (let key2 of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key2) && key2 !== except)
+          __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
     }
     return to;
   };
@@ -21,10 +21,11 @@
     mod
   ));
 
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.plugin.js
+  // ../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.plugin.js
   var require_jquery_plugin = __commonJS({
-    "../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.plugin.js"(exports, module) {
+    "../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.plugin.js"(exports, module) {
       (function() {
+        "use strict";
         var initializing = false;
         window.JQClass = function() {
         };
@@ -34,18 +35,34 @@
           initializing = true;
           var prototype = new this();
           initializing = false;
-          for (var name2 in prop) {
-            prototype[name2] = typeof prop[name2] == "function" && typeof base[name2] == "function" ? function(name3, fn) {
-              return function() {
-                var __super = this._super;
-                this._super = function(args) {
-                  return base[name3].apply(this, args || []);
+          for (var name in prop) {
+            if (typeof prop[name] === "function" && typeof base[name] === "function") {
+              prototype[name] = function(name2, fn) {
+                return function() {
+                  var __super = this._super;
+                  this._super = function(args) {
+                    return base[name2].apply(this, args || []);
+                  };
+                  var ret = fn.apply(this, arguments);
+                  this._super = __super;
+                  return ret;
                 };
-                var ret = fn.apply(this, arguments);
-                this._super = __super;
-                return ret;
-              };
-            }(name2, prop[name2]) : prop[name2];
+              }(name, prop[name]);
+            } else if (typeof prop[name] === "object" && typeof base[name] === "object" && name === "defaultOptions") {
+              var obj1 = base[name];
+              var obj2 = prop[name];
+              var obj3 = {};
+              var key2;
+              for (key2 in obj1) {
+                obj3[key2] = obj1[key2];
+              }
+              for (key2 in obj2) {
+                obj3[key2] = obj2[key2];
+              }
+              prototype[name] = obj3;
+            } else {
+              prototype[name] = prop[name];
+            }
           }
           function JQClass2() {
             if (!initializing && this._init) {
@@ -59,11 +76,12 @@
         };
       })();
       (function($) {
+        "use strict";
         JQClass.classes.JQPlugin = JQClass.extend({
           name: "plugin",
           defaultOptions: {},
           regionalOptions: {},
-          _getters: [],
+          deepMerge: true,
           _getMarker: function() {
             return "is-" + this.name;
           },
@@ -73,29 +91,27 @@
             $[jqName] = this;
             $.fn[jqName] = function(options) {
               var otherArgs = Array.prototype.slice.call(arguments, 1);
-              if ($[jqName]._isNotChained(options, otherArgs)) {
-                return $[jqName][options].apply($[jqName], [this[0]].concat(otherArgs));
-              }
-              return this.each(function() {
+              var inst = this;
+              var returnValue = this;
+              this.each(function() {
                 if (typeof options === "string") {
                   if (options[0] === "_" || !$[jqName][options]) {
                     throw "Unknown method: " + options;
                   }
-                  $[jqName][options].apply($[jqName], [this].concat(otherArgs));
+                  var methodValue = $[jqName][options].apply($[jqName], [this].concat(otherArgs));
+                  if (methodValue !== inst && methodValue !== void 0) {
+                    returnValue = methodValue;
+                    return false;
+                  }
                 } else {
                   $[jqName]._attach(this, options);
                 }
               });
+              return returnValue;
             };
           },
           setDefaults: function(options) {
             $.extend(this.defaultOptions, options || {});
-          },
-          _isNotChained: function(name2, otherArgs) {
-            if (name2 === "option" && (otherArgs.length === 0 || otherArgs.length === 1 && typeof otherArgs[0] === "string")) {
-              return true;
-            }
-            return $.inArray(name2, this._getters) > -1;
           },
           _attach: function(elem2, options) {
             elem2 = $(elem2);
@@ -103,11 +119,8 @@
               return;
             }
             elem2.addClass(this._getMarker());
-            options = $.extend({}, this.defaultOptions, this._getMetadata(elem2), options || {});
-            var inst = $.extend(
-              { name: this.name, elem: elem2, options },
-              this._instSettings(elem2, options)
-            );
+            options = $.extend(this.deepMerge, {}, this.defaultOptions, this._getMetadata(elem2), options || {});
+            var inst = $.extend({ name: this.name, elem: elem2, options }, this._instSettings(elem2, options));
             elem2.data(this.name, inst);
             this._postAttach(elem2, inst);
             this.option(elem2, options);
@@ -120,16 +133,19 @@
           _getMetadata: function(elem) {
             try {
               var data = elem.data(this.name.toLowerCase()) || "";
-              data = data.replace(/'/g, '"');
-              data = data.replace(/([a-zA-Z0-9]+):/g, function(match, group, i) {
+              data = data.replace(/(\\?)'/g, function(e, t) {
+                return t ? "'" : '"';
+              }).replace(/([a-zA-Z0-9]+):/g, function(match, group, i) {
                 var count = data.substring(0, i).match(/"/g);
                 return !count || count.length % 2 === 0 ? '"' + group + '":' : group + ":";
-              });
+              }).replace(/\\:/g, ":");
               data = $.parseJSON("{" + data + "}");
-              for (var name in data) {
-                var value = data[name];
-                if (typeof value === "string" && value.match(/^new Date\((.*)\)$/)) {
-                  data[name] = eval(value);
+              for (var key in data) {
+                if (data.hasOwnProperty(key)) {
+                  var value = data[key];
+                  if (typeof value === "string" && value.match(/^new Date\(([-0-9,\s]*)\)$/)) {
+                    data[key] = eval(value);
+                  }
                 }
               }
               return data;
@@ -140,20 +156,20 @@
           _getInst: function(elem2) {
             return $(elem2).data(this.name) || {};
           },
-          option: function(elem2, name2, value2) {
+          option: function(elem2, name, value2) {
             elem2 = $(elem2);
             var inst = elem2.data(this.name);
-            if (!name2 || typeof name2 === "string" && value2 == null) {
-              var options = (inst || {}).options;
-              return options && name2 ? options[name2] : options;
+            var options = name || {};
+            if (!name || typeof name === "string" && typeof value2 === "undefined") {
+              options = (inst || {}).options;
+              return options && name ? options[name] : options;
             }
             if (!elem2.hasClass(this._getMarker())) {
               return;
             }
-            var options = name2 || {};
-            if (typeof name2 === "string") {
+            if (typeof name === "string") {
               options = {};
-              options[name2] = value2;
+              options[name] = value2;
             }
             this._optionsChanged(elem2, inst, options);
             $.extend(inst.options, options);
@@ -171,8 +187,8 @@
           _preDestroy: function(elem2, inst) {
           }
         });
-        function camelCase(name2) {
-          return name2.replace(/-([a-z])/g, function(match, group) {
+        function camelCase(name) {
+          return name.replace(/-([a-z])/g, function(match, group) {
             return group.toUpperCase();
           });
         }
@@ -195,8 +211,9 @@
   // ../islamic_calendar/islamic_calendar/public/js/islamic_assets.bundle.js
   var import_jquery_plugin = __toESM(require_jquery_plugin());
 
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.js
+  // ../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.calendars.js
   (function($2) {
+    "use strict";
     function Calendars() {
       this.regionalOptions = [];
       this.regionalOptions[""] = {
@@ -211,22 +228,45 @@
       this._localCals = {};
     }
     $2.extend(Calendars.prototype, {
-      instance: function(name2, language) {
-        name2 = (name2 || "gregorian").toLowerCase();
+      instance: function(name, language) {
+        name = (name || "gregorian").toLowerCase();
         language = language || "";
-        var cal = this._localCals[name2 + "-" + language];
-        if (!cal && this.calendars[name2]) {
-          cal = new this.calendars[name2](language);
-          this._localCals[name2 + "-" + language] = cal;
+        var cal = this._localCals[name + "-" + language];
+        if (!cal && this.calendars[name]) {
+          cal = new this.calendars[name](language);
+          this._localCals[name + "-" + language] = cal;
         }
         if (!cal) {
-          throw (this.local.invalidCalendar || this.regionalOptions[""].invalidCalendar).replace(/\{0\}/, name2);
+          throw (this.local.invalidCalendar || this.regionalOptions[""].invalidCalendar).replace(/\{0\}/, name);
         }
         return cal;
       },
       newDate: function(year, month, day, calendar, language) {
-        calendar = (year != null && year.year ? year.calendar() : typeof calendar === "string" ? this.instance(calendar, language) : calendar) || this.instance();
+        calendar = (typeof year !== "undefined" && year !== null && year.year ? year.calendar() : typeof calendar === "string" ? this.instance(calendar, language) : calendar) || this.instance();
         return calendar.newDate(year, month, day);
+      },
+      substituteDigits: function(digits) {
+        return function(value2) {
+          return (value2 + "").replace(/[0-9]/g, function(digit) {
+            return digits[digit];
+          });
+        };
+      },
+      substituteChineseDigits: function(digits, powers) {
+        return function(value2) {
+          var localNumber = "";
+          var power = 0;
+          while (value2 > 0) {
+            var units = value2 % 10;
+            localNumber = (units === 0 ? "" : digits[units] + powers[power]) + localNumber;
+            power++;
+            value2 = Math.floor(value2 / 10);
+          }
+          if (localNumber.indexOf(digits[1] + powers[1]) === 0) {
+            localNumber = localNumber.substr(1);
+          }
+          return localNumber || digits[0];
+        };
       }
     });
     function CDate(calendar, year, month, day) {
@@ -244,7 +284,7 @@
     }
     $2.extend(CDate.prototype, {
       newDate: function(year, month, day) {
-        return this._calendar.newDate(year == null ? this : year, month, day);
+        return this._calendar.newDate(typeof year === "undefined" || year === null ? this : year, month, day);
       },
       year: function(year) {
         return arguments.length === 0 ? this._year : this.set(year, "y");
@@ -335,10 +375,10 @@
     $2.extend(BaseCalendar.prototype, {
       _validateLevel: 0,
       newDate: function(year, month, day) {
-        if (year == null) {
+        if (typeof year === "undefined" || year === null) {
           return this.today();
         }
-        if (typeof year != "number" && typeof year.year() == "number") {
+        if (year.year) {
           this._validate(
             year,
             month,
@@ -454,16 +494,17 @@
       },
       _add: function(date, offset, period) {
         this._validateLevel++;
+        var d;
         if (period === "d" || period === "w") {
           var jd = date.toJD() + offset * (period === "w" ? this.daysInWeek() : 1);
-          var d = date.calendar().fromJD(jd);
+          d = date.calendar().fromJD(jd);
           this._validateLevel--;
           return [d.year(), d.month(), d.day()];
         }
         try {
           var y = date.year() + (period === "y" ? offset : 0);
           var m = date.monthOfYear() + (period === "m" ? offset : 0);
-          var d = date.day();
+          d = date.day();
           var resyncYearMonth = function(calendar) {
             while (m < calendar.minMonth) {
               y--;
@@ -547,7 +588,7 @@
         return this.fromJD($2.calendars.instance().fromJSDate(jsd).toJD());
       },
       _validate: function(year, month, day, error) {
-        if (typeof year != "number" && typeof year.year() == "number") {
+        if (year.year) {
           if (this._validateLevel === 0 && this.name !== year.calendar().name) {
             throw ($2.calendars.local.differentCalendars || $2.calendars.regionalOptions[""].differentCalendars).replace(/\{0\}/, this.local.name).replace(/\{1\}/, year.calendar().local.name);
           }
@@ -601,6 +642,7 @@
           dayNames: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
           dayNamesShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
           dayNamesMin: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+          digits: null,
           dateFormat: "mm/dd/yyyy",
           firstDay: 0,
           isRTL: false
@@ -613,7 +655,7 @@
           this.minDay,
           $2.calendars.local.invalidYear || $2.calendars.regionalOptions[""].invalidYear
         );
-        var year = date.year() + (date.year() < 0 ? 1 : 0);
+        year = date.year() + (date.year() < 0 ? 1 : 0);
         return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
       },
       weekOfYear: function(year, month, day) {
@@ -695,8 +737,175 @@
     $2.calendars.calendars.gregorian = GregorianCalendar;
   })(jQuery);
 
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.plus.js
+  // ../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.calendars.iranian.js
   (function($2) {
+    "use strict";
+    function IranianCalendar(language) {
+      this.local = this.regionalOptions[language || ""] || this.regionalOptions[""];
+    }
+    IranianCalendar.prototype = new $2.calendars.baseCalendar();
+    $2.extend(IranianCalendar.prototype, {
+      name: "Iranian",
+      jdEpoch: 19483205e-1,
+      daysPerMonth: [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29],
+      hasYearZero: false,
+      minMonth: 1,
+      firstMonth: 1,
+      minDay: 1,
+      regionalOptions: {
+        "": {
+          name: "Iranian",
+          epochs: ["BSH", "SH"],
+          monthNames: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
+          monthNamesShort: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
+          dayNames: ["\u064A\u06A9\u0634\u0646\u0628\u0647", "\u062F\u0648\u0634\u0646\u0628\u0647", "\u0633\u0647\u200C\u0634\u0646\u0628\u0647", "\u0686\u0647\u0627\u0631\u0634\u0646\u0628\u0647", "\u067E\u0646\u062C\u0634\u0646\u0628\u0647", "\u062C\u0645\u0639\u0647", "\u0634\u0646\u0628\u0647"],
+          dayNamesShort: ["\u06CC", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
+          dayNamesMin: ["\u06CC", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
+          digits: null,
+          dateFormat: "yyyy/mm/dd",
+          firstDay: 6,
+          isRTL: false
+        }
+      },
+      leapYear: function(year) {
+        var date = this._validate(year, this.minMonth, this.minDay, $2.calendars.local.invalidYear);
+        return this._yearInfo(date.year()).leap === 0;
+      },
+      weekOfYear: function(year, month, day) {
+        var checkDate = this.newDate(year, month, day);
+        checkDate.add(-((checkDate.dayOfWeek() + 1) % 7), "d");
+        return Math.floor((checkDate.dayOfYear() - 1) / 7) + 1;
+      },
+      daysInMonth: function(year, month) {
+        var date = this._validate(year, month, this.minDay, $2.calendars.local.invalidMonth);
+        return this.daysPerMonth[date.month() - 1] + (date.month() === 12 && this.leapYear(date.year()) ? 1 : 0);
+      },
+      weekDay: function(year, month, day) {
+        return this.dayOfWeek(year, month, day) !== 5;
+      },
+      toJD: function(year, month, day) {
+        var date = this._validate(year, month, day, $2.calendars.local.invalidDate);
+        var info = this._yearInfo(date.year());
+        return this._g2d(info.gy, 3, info.march) + 31 * (date.month() - 1) - div(date.month(), 7) * (date.month() - 7) + date.day() - 1;
+      },
+      fromJD: function(jd) {
+        var day, month;
+        var gy = this._d2gy(jd);
+        var year = gy - 621;
+        if (year <= 0) {
+          year--;
+        }
+        var info = this._yearInfo(year);
+        var diff = jd - this._g2d(gy, 3, info.march);
+        if (diff >= 0) {
+          if (diff <= 185) {
+            month = div(diff, 31) + 1;
+            day = mod(diff, 31) + 1;
+            return this.newDate(year, month, day);
+          }
+          diff -= 186;
+        } else {
+          year--;
+          if (year === 0) {
+            year--;
+          }
+          diff += 179;
+          if (info.leap === 1) {
+            diff++;
+          }
+        }
+        month = div(diff, 30) + 7;
+        day = mod(diff, 30) + 1;
+        return this.newDate(year, month, day);
+      },
+      isValid: function(year, month, day) {
+        var valid = $2.calendars.baseCalendar.prototype.isValid.apply(this, arguments);
+        if (valid) {
+          year = typeof year.year === "function" ? year.year() : year;
+          valid = year >= special[0] && year < special[last];
+        }
+        return valid;
+      },
+      _validate: function(year, month, day, error) {
+        var date = $2.calendars.baseCalendar.prototype._validate.apply(this, arguments);
+        if (date.year() < special[0] || date.year() >= special[last]) {
+          throw error.replace(/\{0\}/, this.local.name);
+        }
+        return date;
+      },
+      _d2gy: function(jd) {
+        var i = 4 * (jd + 0.5) + 139361631 + 4 * div(3 * div(4 * (jd + 0.5) + 183187720, 146097), 4) - 3908;
+        var j = 5 * div(mod(i, 1461), 4) + 308;
+        var gm = mod(div(j, 153), 12) + 1;
+        return div(i, 1461) - 100100 + div(8 - gm, 6);
+      },
+      _g2d: function(year, month, day) {
+        var i = div(1461 * (year + div(month - 8, 6) + 100100), 4) + div(153 * mod(month + 9, 12) + 2, 5) + day - 34840408;
+        return i - div(3 * div(year + 100100 + div(month - 8, 6), 100), 4) + 752 - 0.5;
+      },
+      _yearInfo: function(year) {
+        year = year.year ? year.year() : year;
+        var specDiff;
+        if (year < 0) {
+          year++;
+        }
+        var gy = year + 621;
+        var m = -14;
+        var prevSpec = special[0];
+        for (var i = 1; i <= last && (specDiff = special[i] - prevSpec, special[i] <= year); i++) {
+          m += 8 * div(specDiff, 33) + div(mod(specDiff, 33), 4);
+          prevSpec = special[i];
+        }
+        var offset = year - prevSpec;
+        m += 8 * div(offset, 33) + div(mod(offset, 33) + 3, 4);
+        if (mod(specDiff, 33) === 4 && specDiff - offset === 4) {
+          m++;
+        }
+        var r = div(gy, 4) - div(3 * (div(gy, 100) + 1), 4) - 150;
+        var march = 20 + m - r;
+        if (specDiff - offset < 6) {
+          offset = offset - specDiff + 33 * div(specDiff + 4, 33);
+        }
+        var leap = mod(mod(offset + 1, 33) - 1, 4);
+        leap = leap === -1 ? 4 : leap;
+        return { gy, leap, march };
+      }
+    });
+    function div(a, b) {
+      return ~~(a / b);
+    }
+    function mod(a, b) {
+      return a - ~~(a / b) * b;
+    }
+    var special = [
+      -61,
+      9,
+      38,
+      199,
+      426,
+      686,
+      756,
+      818,
+      1111,
+      1181,
+      1210,
+      1635,
+      2060,
+      2097,
+      2192,
+      2262,
+      2324,
+      2394,
+      2456,
+      3178
+    ];
+    var last = special.length - 1;
+    $2.calendars.calendars.iranian = IranianCalendar;
+  })(jQuery);
+
+  // ../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.calendars.plus.js
+  (function($2) {
+    "use strict";
     $2.extend($2.calendars.regionalOptions[""], {
       invalidArguments: "Invalid arguments",
       invalidFormat: "Cannot format a date from another calendar",
@@ -707,8 +916,12 @@
     });
     $2.calendars.local = $2.calendars.regionalOptions[""];
     $2.extend($2.calendars.cdate.prototype, {
-      formatDate: function(format) {
-        return this._calendar.formatDate(format || "", this);
+      formatDate: function(format, settings) {
+        if (typeof format !== "string") {
+          settings = format;
+          format = "";
+        }
+        return this._calendar.formatDate(format || "", this, settings);
       }
     });
     $2.extend($2.calendars.baseCalendar.prototype, {
@@ -748,7 +961,7 @@
         var dayNames = settings.dayNames || this.local.dayNames;
         var monthNamesShort = settings.monthNamesShort || this.local.monthNamesShort;
         var monthNames = settings.monthNames || this.local.monthNames;
-        var calculateWeek = settings.calculateWeek || this.local.calculateWeek;
+        var localNumbers = settings.localNumbers || this.local.localNumbers;
         var doubled = function(match, step) {
           var matches = 1;
           while (iFormat + matches < format.length && format.charAt(iFormat + matches) === match) {
@@ -769,6 +982,9 @@
         var formatName = function(match, value2, shortNames, longNames) {
           return doubled(match) ? longNames[value2] : shortNames[value2];
         };
+        var localiseNumbers = localNumbers && this.local.digits ? this.local.digits : function(value2) {
+          return value2;
+        };
         var output = "";
         var literal = false;
         for (var iFormat = 0; iFormat < format.length; iFormat++) {
@@ -781,15 +997,10 @@
           } else {
             switch (format.charAt(iFormat)) {
               case "d":
-                output += formatNumber("d", date.day(), 2);
+                output += localiseNumbers(formatNumber("d", date.day(), 2));
                 break;
               case "D":
-                output += formatName(
-                  "D",
-                  date.dayOfWeek(),
-                  dayNamesShort,
-                  dayNames
-                );
+                output += formatName("D", date.dayOfWeek(), dayNamesShort, dayNames);
                 break;
               case "o":
                 output += formatNumber("o", date.dayOfYear(), 3);
@@ -798,18 +1009,13 @@
                 output += formatNumber("w", date.weekOfYear(), 2);
                 break;
               case "m":
-                output += formatNumber("m", date.month(), 2);
+                output += localiseNumbers(formatNumber("m", date.month(), 2));
                 break;
               case "M":
-                output += formatName(
-                  "M",
-                  date.month() - this.minMonth,
-                  monthNamesShort,
-                  monthNames
-                );
+                output += formatName("M", date.month() - this.minMonth, monthNamesShort, monthNames);
                 break;
               case "y":
-                output += doubled("y", 2) ? date.year() : (date.year() % 100 < 10 ? "0" : "") + date.year() % 100;
+                output += localiseNumbers(doubled("y", 2) ? date.year() : (date.year() % 100 < 10 ? "0" : "") + date.year() % 100);
                 break;
               case "Y":
                 doubled("Y", 2);
@@ -839,7 +1045,7 @@
         return output;
       },
       parseDate: function(format, value2, settings) {
-        if (value2 == null) {
+        if (typeof value2 === "undefined" || value2 === null) {
           throw $2.calendars.local.invalidArguments || $2.calendars.regionalOptions[""].invalidArguments;
         }
         value2 = typeof value2 === "object" ? value2.toString() : value2 + "";
@@ -854,11 +1060,11 @@
         var dayNames = settings.dayNames || this.local.dayNames;
         var monthNamesShort = settings.monthNamesShort || this.local.monthNamesShort;
         var monthNames = settings.monthNames || this.local.monthNames;
-        var jd = -1;
-        var year = -1;
-        var month = -1;
-        var day = -1;
-        var doy = -1;
+        var jd = NaN;
+        var year = NaN;
+        var month = NaN;
+        var day = NaN;
+        var doy = NaN;
         var shortYear = false;
         var literal = false;
         var doubled = function(match, step) {
@@ -883,11 +1089,19 @@
         var calendar = this;
         var getName = function(match, shortNames, longNames, step) {
           var names = doubled(match, step) ? longNames : shortNames;
+          var index = -1;
           for (var i = 0; i < names.length; i++) {
             if (value2.substr(iValue, names[i].length).toLowerCase() === names[i].toLowerCase()) {
-              iValue += names[i].length;
-              return i + calendar.minMonth;
+              if (index === -1) {
+                index = i;
+              } else if (names[i].length > names[index].length) {
+                index = i;
+              }
             }
+          }
+          if (index > -1) {
+            iValue += names[index].length;
+            return index + calendar.minMonth;
           }
           throw ($2.calendars.local.unknownNameAt || $2.calendars.regionalOptions[""].unknownNameAt).replace(/\{0\}/, iValue);
         };
@@ -965,12 +1179,12 @@
         if (iValue < value2.length) {
           throw $2.calendars.local.unexpectedText || $2.calendars.regionalOptions[""].unexpectedText;
         }
-        if (year === -1) {
+        if (isNaN(year)) {
           year = this.today().year();
         } else if (year < 100 && shortYear) {
           year += shortYearCutoff === -1 ? 1900 : this.today().year() - this.today().year() % 100 - (year <= shortYearCutoff ? 0 : 100);
         }
-        if (doy > -1) {
+        if (!isNaN(doy)) {
           month = 1;
           day = doy;
           for (var dim = this.daysInMonth(year, month); day > dim; dim = this.daysInMonth(year, month)) {
@@ -978,7 +1192,7 @@
             day -= dim;
           }
         }
-        return jd > -1 ? this.fromJD(jd) : this.newDate(year, month, day);
+        return !isNaN(jd) ? this.fromJD(jd) : this.newDate(year, month, day);
       },
       determineDate: function(dateSpec, defaultDate, currentDate, dateFormat, settings) {
         if (currentDate && typeof currentDate !== "object") {
@@ -1007,14 +1221,15 @@
           return date;
         };
         defaultDate = defaultDate ? defaultDate.newDate() : null;
-        dateSpec = dateSpec == null ? defaultDate : typeof dateSpec === "string" ? offsetString(dateSpec) : typeof dateSpec === "number" ? isNaN(dateSpec) || dateSpec === Infinity || dateSpec === -Infinity ? defaultDate : calendar.today().add(dateSpec, "d") : calendar.newDate(dateSpec);
+        dateSpec = typeof dateSpec === "undefined" || dateSpec === null ? defaultDate : typeof dateSpec === "string" ? offsetString(dateSpec) : typeof dateSpec === "number" ? isNaN(dateSpec) || dateSpec === Infinity || dateSpec === -Infinity ? defaultDate : calendar.today().add(dateSpec, "d") : calendar.newDate(dateSpec);
         return dateSpec;
       }
     });
   })(jQuery);
 
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.picker.js
+  // ../islamic_calendar/islamic_calendar/public/islamic_lib/jquery.calendars.picker.js
   (function($2) {
+    "use strict";
     var pluginName = "calendarsPicker";
     $2.JQPlugin.createPlugin({
       name: pluginName,
@@ -1132,7 +1347,7 @@
           date: function(inst) {
             return inst.options.calendar.today();
           },
-          action: function(inst) {
+          action: function() {
             plugin.showMonth(this);
           }
         },
@@ -1140,13 +1355,13 @@
           text: "clearText",
           status: "clearStatus",
           keystroke: { keyCode: 35, ctrlKey: true },
-          enabled: function(inst) {
+          enabled: function() {
             return true;
           },
-          date: function(inst) {
+          date: function() {
             return null;
           },
-          action: function(inst) {
+          action: function() {
             plugin.clear(this);
           }
         },
@@ -1154,13 +1369,13 @@
           text: "closeText",
           status: "closeStatus",
           keystroke: { keyCode: 27 },
-          enabled: function(inst) {
+          enabled: function() {
             return true;
           },
-          date: function(inst) {
+          date: function() {
             return null;
           },
-          action: function(inst) {
+          action: function() {
             plugin.hide(this);
           }
         },
@@ -1190,7 +1405,7 @@
           date: function(inst) {
             return inst.drawDate.newDate().add(-1, "d");
           },
-          action: function(inst) {
+          action: function() {
             plugin.changeDay(this, -1);
           }
         },
@@ -1205,7 +1420,7 @@
           date: function(inst) {
             return inst.drawDate.newDate().add(1, "d");
           },
-          action: function(inst) {
+          action: function() {
             plugin.changeDay(this, 1);
           }
         },
@@ -1238,6 +1453,7 @@
         fixedWeeks: false,
         firstDay: null,
         calculateWeek: null,
+        localNumbers: false,
         monthsToShow: 1,
         monthsOffset: 0,
         monthsToStep: 1,
@@ -1288,6 +1504,8 @@
           closeText: "Close",
           closeStatus: "Close the datepicker",
           yearStatus: "Change the year",
+          earlierText: "&#160;&#160;\u25B2",
+          laterText: "&#160;&#160;\u25BC",
           monthStatus: "Change the month",
           weekText: "Wk",
           weekStatus: "Week of the year",
@@ -1296,7 +1514,6 @@
           isRTL: false
         }
       },
-      _getters: ["getDate", "isDisabled", "isSelectable", "retrieveDate"],
       _disabled: [],
       _popupClass: "calendars-popup",
       _triggerClass: "calendars-trigger",
@@ -1316,20 +1533,20 @@
           drawDate: null,
           pickingRange: false,
           inline: $2.inArray(elem2[0].nodeName.toLowerCase(), ["div", "span"]) > -1,
-          get: function(name2) {
-            if ($2.inArray(name2, ["defaultDate", "minDate", "maxDate"]) > -1) {
+          get: function(name) {
+            if ($2.inArray(name, ["defaultDate", "minDate", "maxDate"]) > -1) {
               return this.options.calendar.determineDate(
-                this.options[name2],
+                this.options[name],
                 null,
                 this.selectedDates[0],
                 this.get("dateFormat"),
                 this.getConfig()
               );
             }
-            if (name2 === "dateFormat") {
+            if (name === "dateFormat") {
               return this.options.dateFormat || this.options.calendar.local.dateFormat;
             }
-            return this.options[name2];
+            return this.options[name];
           },
           curMinDate: function() {
             return this.pickingRange ? this.selectedDates[0] : this.get("minDate");
@@ -1364,8 +1581,8 @@
       },
       _optionsChanged: function(elem2, inst, options) {
         if (options.calendar && options.calendar !== inst.options.calendar) {
-          var discardDate = function(name2) {
-            return typeof inst.options[name2] === "object" ? null : inst.options[name2];
+          var discardDate = function(name) {
+            return typeof inst.options[name] === "object" ? null : inst.options[name];
           };
           options = $2.extend({
             defaultDate: discardDate("defaultDate"),
@@ -1433,7 +1650,10 @@
             date.month(findMax(calendar.local[dateFormat.match(/MM/) ? "monthNames" : "monthNamesShort"]) + 1);
             date.day(findMax(calendar.local[dateFormat.match(/DD/) ? "dayNames" : "dayNamesShort"]) + 20 - date.dayOfWeek());
           }
-          inst.elem.attr("size", date.formatDate(dateFormat).length);
+          inst.elem.attr("size", date.formatDate(
+            dateFormat,
+            { localNumbers: inst.options.localnumbers }
+          ).length);
         }
       },
       _preDestroy: function(elem2, inst) {
@@ -1450,7 +1670,7 @@
       },
       multipleEvents: function(fns) {
         var funcs = arguments;
-        return function(args) {
+        return function() {
           for (var i = 0; i < funcs.length; i++) {
             funcs[i].apply(this, arguments);
           }
@@ -1463,7 +1683,7 @@
         }
         var inst = this._getInst(elem2);
         if (inst.inline) {
-          elem2.children("." + this._disableClass).remove().end().find("button,select").prop("disabled", false).end().find("a").attr("href", "javascript:void(0)");
+          elem2.children("." + this._disableClass).remove().end().find("button,select").prop("disabled", false).end().find("a").attr("href", "#");
         } else {
           elem2.prop("disabled", false);
           inst.trigger.filter("button." + this._triggerClass).prop("disabled", false).end().filter("img." + this._triggerClass).css({ opacity: "1.0", cursor: "" });
@@ -1533,9 +1753,9 @@
           showSpeed = showSpeed === "normal" && $2.ui && parseInt($2.ui.version.substring(2)) >= 8 ? "_default" : showSpeed;
           if ($2.effects && ($2.effects[showAnim] || $2.effects.effect && $2.effects.effect[showAnim])) {
             var data2 = inst.div.data();
-            for (var key in data2) {
-              if (key.match(/^ec\.storage\./)) {
-                data2[key] = inst._mainDiv.css(key.replace(/ec\.storage\./, ""));
+            for (var key2 in data2) {
+              if (key2.match(/^ec\.storage\./)) {
+                data2[key2] = inst._mainDiv.css(key2.replace(/ec\.storage\./, ""));
               }
             }
             inst.div.data(data2).show(showAnim, inst.options.showOptions, showSpeed);
@@ -1588,7 +1808,10 @@
             }
           }
           if (inst.inline) {
+            var index = $2("a, :input", elem2).index($2(":focus", elem2));
             elem2.html(this._generateContent(elem2[0], inst));
+            var focus = elem2.find("a, :input");
+            focus.eq(Math.max(Math.min(index, focus.length - 1), 0)).focus();
           } else if (plugin.curInst === inst) {
             if (!inst.div) {
               inst.div = $2("<div></div>").addClass(this._popupClass).css({
@@ -1615,9 +1838,10 @@
           var calendar = inst.options.calendar;
           var dateFormat = inst.get("dateFormat");
           var altFormat = inst.options.altFormat || dateFormat;
+          var settings = { localNumbers: inst.options.localNumbers };
           for (var i = 0; i < inst.selectedDates.length; i++) {
-            value2 += keyUp ? "" : (i > 0 ? sep : "") + calendar.formatDate(dateFormat, inst.selectedDates[i]);
-            altValue += (i > 0 ? sep : "") + calendar.formatDate(altFormat, inst.selectedDates[i]);
+            value2 += keyUp ? "" : (i > 0 ? sep : "") + calendar.formatDate(dateFormat, inst.selectedDates[i], settings);
+            altValue += (i > 0 ? sep : "") + calendar.formatDate(altFormat, inst.selectedDates[i], settings);
           }
           if (!inst.inline && !keyUp) {
             $2(elem2).val(value2);
@@ -1628,6 +1852,7 @@
             inst.options.onSelect.apply(elem2, [inst.selectedDates]);
             inst.inSelect = false;
           }
+          $2(elem2).change();
         }
       },
       _getBorders: function(elem2) {
@@ -1649,7 +1874,7 @@
         }
         var isFixed = false;
         $2(inst.elem).parents().each(function() {
-          isFixed |= $2(this).css("position") === "fixed";
+          isFixed = isFixed || $2(this).css("position") === "fixed";
           return !isFixed;
         });
         var scrollX = document.documentElement.scrollLeft || document.body.scrollLeft;
@@ -1727,10 +1952,11 @@
         }
       },
       _keyDown: function(event2) {
-        var elem2 = event2.target;
+        var elem2 = event2.data && event2.data.elem || event2.target;
         var inst = plugin._getInst(elem2);
         var handled = false;
-        if (inst.div) {
+        var command;
+        if (inst.inline || inst.div) {
           if (event2.keyCode === 9) {
             plugin.hide(elem2);
           } else if (event2.keyCode === 13) {
@@ -1741,17 +1967,19 @@
             handled = true;
           } else {
             var commands = inst.options.commands;
-            for (var name2 in commands) {
-              var command = commands[name2];
-              if (command.keystroke.keyCode === event2.keyCode && !!command.keystroke.ctrlKey === !!(event2.ctrlKey || event2.metaKey) && !!command.keystroke.altKey === event2.altKey && !!command.keystroke.shiftKey === event2.shiftKey) {
-                plugin.performAction(elem2, name2);
-                handled = true;
-                break;
+            for (var name in commands) {
+              if (inst.options.commands.hasOwnProperty(name)) {
+                command = commands[name];
+                if (command.keystroke.keyCode === event2.keyCode && !!command.keystroke.ctrlKey === !!(event2.ctrlKey || event2.metaKey) && !!command.keystroke.altKey === event2.altKey && !!command.keystroke.shiftKey === event2.shiftKey) {
+                  plugin.performAction(elem2, name);
+                  handled = true;
+                  break;
+                }
               }
             }
           }
         } else {
-          var command = inst.options.commands.current;
+          command = inst.options.commands.current;
           if (command.keystroke.keyCode === event2.keyCode && !!command.keystroke.ctrlKey === !!(event2.ctrlKey || event2.metaKey) && !!command.keystroke.altKey === event2.altKey && !!command.keystroke.shiftKey === event2.shiftKey) {
             plugin.show(elem2);
             handled = true;
@@ -1765,7 +1993,7 @@
         return !handled;
       },
       _keyPress: function(event2) {
-        var inst = plugin._getInst(event2.target);
+        var inst = plugin._getInst(event2.data && event2.data.elem || event2.target);
         if (!$2.isEmptyObject(inst) && inst.options.constrainInput) {
           var ch = String.fromCharCode(event2.keyCode || event2.charCode);
           var allowedChars = plugin._allowedChars(inst);
@@ -1824,7 +2052,7 @@
         return allowedChars;
       },
       _keyUp: function(event2) {
-        var elem2 = event2.target;
+        var elem2 = event2.data && event2.data.elem || event2.target;
         var inst = plugin._getInst(elem2);
         if (!$2.isEmptyObject(inst) && !inst.ctrlKey && inst.lastVal !== inst.elem.val()) {
           try {
@@ -1832,7 +2060,7 @@
             if (dates.length > 0) {
               plugin.setDate(elem2, dates, null, true);
             }
-          } catch (event3) {
+          } catch (e) {
           }
         }
         return true;
@@ -1957,14 +2185,14 @@
       },
       showMonth: function(elem2, year, month, day) {
         var inst = this._getInst(elem2);
-        if (!$2.isEmptyObject(inst) && (day != null || (inst.drawDate.year() !== year || inst.drawDate.month() !== month))) {
+        if (!$2.isEmptyObject(inst) && (typeof day !== "undefined" && day !== null || inst.drawDate.year() !== year || inst.drawDate.month() !== month)) {
           inst.prevDate = inst.drawDate.newDate();
           var calendar = inst.options.calendar;
-          var show = this._checkMinMax(year != null ? calendar.newDate(year, month, 1) : calendar.today(), inst);
+          var show = this._checkMinMax(typeof year !== "undefined" && year !== null ? calendar.newDate(year, month, 1) : calendar.today(), inst);
           inst.drawDate.date(
             show.year(),
             show.month(),
-            day != null ? day : Math.min(
+            typeof day !== "undefined" && day !== null ? day : Math.min(
               inst.drawDate.day(),
               calendar.daysInMonth(show.year(), show.month())
             )
@@ -2025,7 +2253,7 @@
           } else {
             inst.selectedDates = [date];
           }
-          inst.prevDate = date.newDate();
+          inst.prevDate = inst.drawDate = date.newDate();
           this._updateInput(elem2);
           if (inst.inline || inst.pickingRange || inst.selectedDates.length < (inst.options.multiSelect || (inst.options.rangeSelect ? 2 : 1))) {
             this._update(elem2);
@@ -2060,32 +2288,34 @@
           monthRows += this._prepare(inst.options.renderer.monthRow, inst).replace(/\{months\}/, months);
         }
         var picker = this._prepare(inst.options.renderer.picker, inst).replace(/\{months\}/, monthRows).replace(/\{weekHeader\}/g, this._generateDayHeaders(inst, inst.options.calendar, inst.options.renderer));
-        var addCommand = function(type, open, close, name3, classes) {
-          if (picker.indexOf("{" + type + ":" + name3 + "}") === -1) {
+        var addCommand = function(type, open, close, name2, classes) {
+          if (picker.indexOf("{" + type + ":" + name2 + "}") === -1) {
             return;
           }
-          var command = inst.options.commands[name3];
+          var command = inst.options.commands[name2];
           var date = inst.options.commandsAsDateFormat ? command.date.apply(elem2, [inst]) : null;
           picker = picker.replace(
-            new RegExp("\\{" + type + ":" + name3 + "\\}", "g"),
-            "<" + open + (command.status ? ' title="' + inst.options[command.status] + '"' : "") + ' class="' + inst.options.renderer.commandClass + " " + inst.options.renderer.commandClass + "-" + name3 + " " + classes + (command.enabled(inst) ? "" : " " + inst.options.renderer.disabledClass) + '">' + (date ? date.formatDate(inst.options[command.text]) : inst.options[command.text]) + "</" + close + ">"
+            new RegExp("\\{" + type + ":" + name2 + "\\}", "g"),
+            "<" + open + (command.status ? ' title="' + inst.options[command.status] + '"' : "") + ' class="' + inst.options.renderer.commandClass + " " + inst.options.renderer.commandClass + "-" + name2 + " " + classes + (command.enabled(inst) ? "" : " " + inst.options.renderer.disabledClass) + '">' + (date ? date.formatDate(inst.options[command.text], { localNumbers: inst.options.localNumbers }) : inst.options[command.text]) + "</" + close + ">"
           );
         };
-        for (var name2 in inst.options.commands) {
-          addCommand(
-            "button",
-            'button type="button"',
-            "button",
-            name2,
-            inst.options.renderer.commandButtonClass
-          );
-          addCommand(
-            "link",
-            'a href="javascript:void(0)"',
-            "a",
-            name2,
-            inst.options.renderer.commandLinkClass
-          );
+        for (var name in inst.options.commands) {
+          if (inst.options.commands.hasOwnProperty(name)) {
+            addCommand(
+              "button",
+              'button type="button"',
+              "button",
+              name,
+              inst.options.renderer.commandButtonClass
+            );
+            addCommand(
+              "link",
+              'a href="javascript:void(0)"',
+              "a",
+              name,
+              inst.options.renderer.commandLinkClass
+            );
+          }
         }
         picker = $2(picker);
         if (monthsToShow[1] > 1) {
@@ -2096,13 +2326,16 @@
           });
         }
         var self = this;
+        function removeHighlight(elem3) {
+          (inst.inline ? $2(elem3).closest("." + self._getMarker()) : inst.div).find(inst.options.renderer.daySelector + " a").removeClass(inst.options.renderer.highlightedClass);
+        }
         picker.find(inst.options.renderer.daySelector + " a").hover(
           function() {
-            (inst.inline ? $2(this).closest("." + self._getMarker()) : inst.div).find(inst.options.renderer.daySelector + " a").removeClass(inst.options.renderer.highlightedClass);
+            removeHighlight(this);
             $2(this).addClass(inst.options.renderer.highlightedClass);
           },
           function() {
-            (inst.inline ? $2(this).closest("." + self._getMarker()) : inst.div).find(inst.options.renderer.daySelector + " a").removeClass(inst.options.renderer.highlightedClass);
+            removeHighlight(this);
           }
         ).click(function() {
           self.selectDate(elem2, this);
@@ -2122,7 +2355,6 @@
             year = isNaN(year) ? inst.drawDate.year() : year;
             self.showMonth(elem2, year, inst.drawDate.month(), inst.drawDate.day());
           } catch (e) {
-            alert(e);
           }
         }).keydown(function(event2) {
           if (event2.keyCode === 13) {
@@ -2132,6 +2364,8 @@
             inst.elem.focus();
           }
         });
+        var data2 = { elem: inst.elem[0] };
+        picker.keydown(data2, this._keyDown).keypress(data2, this._keyPress).keyup(data2, this._keyUp);
         picker.find("." + inst.options.renderer.commandClass).click(function() {
           if (!$2(this).hasClass(inst.options.renderer.disabledClass)) {
             var action = this.className.replace(
@@ -2167,7 +2401,7 @@
         monthsToShow = $2.isArray(monthsToShow) ? monthsToShow : [1, monthsToShow];
         var fixedWeeks = inst.options.fixedWeeks || monthsToShow[0] * monthsToShow[1] > 1;
         var firstDay = inst.options.firstDay;
-        firstDay = firstDay == null ? calendar.local.firstDay : firstDay;
+        firstDay = typeof firstDay === "undefined" || firstDay === null ? calendar.local.firstDay : firstDay;
         var leadDays = (calendar.dayOfWeek(year, month, calendar.minDay) - firstDay + calendar.daysInWeek()) % calendar.daysInWeek();
         var numWeeks = fixedWeeks ? 6 : Math.ceil((leadDays + daysInMonth) / calendar.daysInWeek());
         var selectOtherMonths = inst.options.selectOtherMonths && inst.options.showOtherMonths;
@@ -2178,6 +2412,9 @@
         var drawDate = calendar.newDate(year, month, calendar.minDay);
         drawDate.add(-leadDays - (fixedWeeks && (drawDate.dayOfWeek() === firstDay || drawDate.daysInMonth() < calendar.daysInWeek()) ? calendar.daysInWeek() : 0), "d");
         var jd = drawDate.toJD();
+        var localiseNumbers = function(value2) {
+          return inst.options.localNumbers && calendar.local.digits ? calendar.local.digits(value2) : value2;
+        };
         var weeks = "";
         for (var week = 0; week < numWeeks; week++) {
           var weekOfYear = !showWeeks ? "" : '<span class="jd' + jd + '">' + ($2.isFunction(inst.options.calculateWeek) ? inst.options.calculateWeek(drawDate) : drawDate.weekOfYear()) + "</span>";
@@ -2198,7 +2435,10 @@
             var selectable = (selectOtherMonths || drawDate.month() === month) && this._isSelectable(elem2, drawDate, dateInfo.selectable, minDate, maxDate);
             days += this._prepare(renderer.day, inst).replace(
               /\{day\}/g,
-              (selectable ? '<a href="javascript:void(0)"' : "<span") + ' class="jd' + jd + " " + (dateInfo.dateClass || "") + (selected && (selectOtherMonths || drawDate.month() === month) ? " " + renderer.selectedClass : "") + (selectable ? " " + renderer.defaultClass : "") + (drawDate.weekDay() ? "" : " " + renderer.weekendClass) + (drawDate.month() === month ? "" : " " + renderer.otherMonthClass) + (drawDate.compareTo(today) === 0 && drawDate.month() === month ? " " + renderer.todayClass : "") + (drawDate.compareTo(inst.drawDate) === 0 && drawDate.month() === month ? " " + renderer.highlightedClass : "") + '"' + (dateInfo.title || inst.options.dayStatus && selectable ? ' title="' + (dateInfo.title || drawDate.formatDate(inst.options.dayStatus)) + '"' : "") + ">" + (inst.options.showOtherMonths || drawDate.month() === month ? dateInfo.content || drawDate.day() : "&nbsp;") + (selectable ? "</a>" : "</span>")
+              (selectable ? '<a href="javascript:void(0)"' : "<span") + ' class="jd' + jd + " " + (dateInfo.dateClass || "") + (selected && (selectOtherMonths || drawDate.month() === month) ? " " + renderer.selectedClass : "") + (selectable ? " " + renderer.defaultClass : "") + (drawDate.weekDay() ? "" : " " + renderer.weekendClass) + (drawDate.month() === month ? "" : " " + renderer.otherMonthClass) + (drawDate.compareTo(today) === 0 && drawDate.month() === month ? " " + renderer.todayClass : "") + (drawDate.compareTo(inst.drawDate) === 0 && drawDate.month() === month ? " " + renderer.highlightedClass : "") + '"' + (dateInfo.title || inst.options.dayStatus && selectable ? ' title="' + (dateInfo.title || drawDate.formatDate(
+                inst.options.dayStatus,
+                { localNumbers: inst.options.localNumbers }
+              )) + '"' : "") + ">" + (inst.options.showOtherMonths || drawDate.month() === month ? dateInfo.content || localiseNumbers(drawDate.day()) : "&#160;") + (selectable ? "</a>" : "</span>")
             );
             drawDate.add(1, "d");
             jd++;
@@ -2216,13 +2456,17 @@
           monthHeader,
           calendar,
           renderer
-        ) : calendar.formatDate(monthHeader, calendar.newDate(year, month, calendar.minDay));
+        ) : calendar.formatDate(
+          monthHeader,
+          calendar.newDate(year, month, calendar.minDay),
+          { localNumbers: inst.options.localNumbers }
+        );
         var weekHeader = this._prepare(renderer.weekHeader, inst).replace(/\{days\}/g, this._generateDayHeaders(inst, calendar, renderer));
         return this._prepare(renderer.month, inst).replace(/\{monthHeader(:[^\}]+)?\}/g, monthHeader).replace(/\{weekHeader\}/g, weekHeader).replace(/\{weeks\}/g, weeks);
       },
       _generateDayHeaders: function(inst, calendar, renderer) {
         var firstDay = inst.options.firstDay;
-        firstDay = firstDay == null ? calendar.local.firstDay : firstDay;
+        firstDay = typeof firstDay === "undefined" || firstDay === null ? calendar.local.firstDay : firstDay;
         var header = "";
         for (var day = 0; day < calendar.daysInWeek(); day++) {
           var dow = (day + firstDay) % calendar.daysInWeek();
@@ -2235,7 +2479,11 @@
       },
       _generateMonthSelection: function(inst, year, month, minDate, maxDate, monthHeader, calendar) {
         if (!inst.options.changeMonth) {
-          return calendar.formatDate(monthHeader, calendar.newDate(year, month, 1));
+          return calendar.formatDate(
+            monthHeader,
+            calendar.newDate(year, month, 1),
+            { localNumbers: inst.options.localNumbers }
+          );
         }
         var monthNames = calendar.local["monthNames" + (monthHeader.match(/mm/i) ? "" : "Short")];
         var html = monthHeader.replace(/m+/i, "\\x2E").replace(/y+/i, "\\x2F");
@@ -2252,9 +2500,12 @@
         }
         selector += "</select>";
         html = html.replace(/\\x2E/, selector);
+        var localiseNumbers = function(value2) {
+          return inst.options.localNumbers && calendar.local.digits ? calendar.local.digits(value2) : value2;
+        };
         var yearRange = inst.options.yearRange;
         if (yearRange === "any") {
-          selector = '<select class="' + this._monthYearClass + " " + this._anyYearClass + '" title="' + inst.options.yearStatus + '"><option>' + year + '</option></select><input class="' + this._monthYearClass + " " + this._curMonthClass + month + '" value="' + year + '">';
+          selector = '<select class="' + this._monthYearClass + " " + this._anyYearClass + '" title="' + inst.options.yearStatus + '"><option value="' + year + '">' + localiseNumbers(year) + '</option></select><input class="' + this._monthYearClass + " " + this._curMonthClass + month + '" value="' + year + '">';
         } else {
           yearRange = yearRange.split(":");
           var todayYear = calendar.today().year();
@@ -2263,22 +2514,37 @@
           selector = '<select class="' + this._monthYearClass + '" title="' + inst.options.yearStatus + '">';
           start = calendar.newDate(start + 1, calendar.firstMonth, calendar.minDay).add(-1, "d");
           end = calendar.newDate(end, calendar.firstMonth, calendar.minDay);
-          var addYear = function(y2) {
+          var addYear = function(y2, yDisplay) {
             if (y2 !== 0 || calendar.hasYearZero) {
-              selector += '<option value="' + Math.min(month, calendar.monthsInYear(y2) - 1 + calendar.minMonth) + "/" + y2 + '"' + (year === y2 ? ' selected="selected"' : "") + ">" + y2 + "</option>";
+              selector += '<option value="' + Math.min(month, calendar.monthsInYear(y2) - 1 + calendar.minMonth) + "/" + y2 + '"' + (year === y2 ? ' selected="selected"' : "") + ">" + (yDisplay || localiseNumbers(y2)) + "</option>";
             }
           };
+          var earlierLater, y;
           if (start.toJD() < end.toJD()) {
             start = (minDate && minDate.compareTo(start) === 1 ? minDate : start).year();
             end = (maxDate && maxDate.compareTo(end) === -1 ? maxDate : end).year();
-            for (var y = start; y <= end; y++) {
+            earlierLater = Math.floor((end - start) / 2);
+            if (!minDate || minDate.year() < start) {
+              addYear(start - earlierLater, inst.options.earlierText);
+            }
+            for (y = start; y <= end; y++) {
               addYear(y);
+            }
+            if (!maxDate || maxDate.year() > end) {
+              addYear(end + earlierLater, inst.options.laterText);
             }
           } else {
             start = (maxDate && maxDate.compareTo(start) === -1 ? maxDate : start).year();
             end = (minDate && minDate.compareTo(end) === 1 ? minDate : end).year();
-            for (var y = start; y >= end; y--) {
+            earlierLater = Math.floor((start - end) / 2);
+            if (!maxDate || maxDate.year() > start) {
+              addYear(start + earlierLater, inst.options.earlierText);
+            }
+            for (y = start; y >= end; y--) {
               addYear(y);
+            }
+            if (!minDate || minDate.year() < end) {
+              addYear(end - earlierLater, inst.options.laterText);
             }
           }
           selector += "</select>";
@@ -2302,9 +2568,10 @@
         replaceSection("inline", inst.inline);
         replaceSection("popup", !inst.inline);
         var pattern = /\{l10n:([^\}]+)\}/;
-        var matches = null;
-        while (matches = pattern.exec(text)) {
+        var matches = pattern.exec(text);
+        while (matches) {
           text = text.replace(matches[0], inst.options[matches[1]]);
+          matches = pattern.exec(text);
         }
         return text;
       }
@@ -2317,121 +2584,6 @@
     });
   })(jQuery);
 
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.picker-ar.js
-  (function($2) {
-    $2.fn.datepicker.language["fa", "ps"] = {
-      days: ["\u064A\u06A9\u0634\u0646\u0628\u0647", "\u062F\u0648\u0634\u0646\u0628\u0647", "\u0633\u0647\u200C\u0634\u0646\u0628\u0647", "\u0686\u0647\u0627\u0631\u0634\u0646\u0628\u0647", "\u067E\u0646\u062C\u0634\u0646\u0628\u0647", "\u062C\u0645\u0639\u0647", "\u0634\u0646\u0628\u0647"],
-      daysShort: ["\u064A", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
-      daysMin: ["\u064A", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
-      months: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-      monthsShort: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628", "\u0645\u06CC\u0632", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-      today: "\u0627\u0645\u0631\u0648\u0632",
-      clear: "\u067E\u0627\u06A9",
-      dateFormat: "dd.mm.yyyy",
-      timeFormat: "hh:ii",
-      firstDay: 6,
-      isRTL: true
-    };
-  })(jQuery);
-
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.persian.js
-  (function($2) {
-    "use strict";
-    function PersianCalendar(language) {
-      this.local = this.regionalOptions[language || ""] || this.regionalOptions[""];
-    }
-    PersianCalendar.prototype = new $2.calendars.baseCalendar();
-    $2.extend(PersianCalendar.prototype, {
-      name: "Persian",
-      jdEpoch: 19483205e-1,
-      daysPerMonth: [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29],
-      hasYearZero: false,
-      minMonth: 1,
-      firstMonth: 1,
-      minDay: 1,
-      regionalOptions: {
-        "": {
-          name: "Persian",
-          epochs: ["BP", "AP"],
-          monthNames: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-          monthNamesShort: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-          dayNames: ["\u064A\u06A9\u0634\u0646\u0628\u0647", "\u062F\u0648\u0634\u0646\u0628\u0647", "\u0633\u0647\u200C\u0634\u0646\u0628\u0647", "\u0686\u0647\u0627\u0631\u0634\u0646\u0628\u0647", "\u067E\u0646\u062C\u0634\u0646\u0628\u0647", "\u062C\u0645\u0639\u0647", "\u0634\u0646\u0628\u0647"],
-          dayNamesShort: ["Yek", "Do", "Se", "Ch\xE6", "Panj", "Jom", "Sha"],
-          dayNamesMin: ["Ye", "Do", "Se", "Ch", "Pa", "Jo", "Sh"],
-          digits: null,
-          dateFormat: "yyyy/mm/dd",
-          firstDay: 6,
-          isRTL: false
-        }
-      },
-      leapYear: function(year) {
-        var date = this._validate(year, this.minMonth, this.minDay, $2.calendars.local.invalidYear);
-        return ((date.year() - (date.year() > 0 ? 474 : 473)) % 2820 + 474 + 38) * 682 % 2816 < 682;
-      },
-      weekOfYear: function(year, month, day) {
-        var checkDate = this.newDate(year, month, day);
-        checkDate.add(-((checkDate.dayOfWeek() + 1) % 7), "d");
-        return Math.floor((checkDate.dayOfYear() - 1) / 7) + 1;
-      },
-      daysInMonth: function(year, month) {
-        var date = this._validate(year, month, this.minDay, $2.calendars.local.invalidMonth);
-        return this.daysPerMonth[date.month() - 1] + (date.month() === 12 && this.leapYear(date.year()) ? 1 : 0);
-      },
-      weekDay: function(year, month, day) {
-        return this.dayOfWeek(year, month, day) !== 5;
-      },
-      toJD: function(year, month, day) {
-        var date = this._validate(year, month, day, $2.calendars.local.invalidDate);
-        year = date.year();
-        month = date.month();
-        day = date.day();
-        var epBase = year - (year >= 0 ? 474 : 473);
-        var epYear = 474 + mod(epBase, 2820);
-        return day + (month <= 7 ? (month - 1) * 31 : (month - 1) * 30 + 6) + Math.floor((epYear * 682 - 110) / 2816) + (epYear - 1) * 365 + Math.floor(epBase / 2820) * 1029983 + this.jdEpoch - 1;
-      },
-      fromJD: function(jd) {
-        jd = Math.floor(jd) + 0.5;
-        var depoch = jd - this.toJD(475, 1, 1);
-        var cycle = Math.floor(depoch / 1029983);
-        var cyear = mod(depoch, 1029983);
-        var ycycle = 2820;
-        if (cyear !== 1029982) {
-          var aux1 = Math.floor(cyear / 366);
-          var aux2 = mod(cyear, 366);
-          ycycle = Math.floor((2134 * aux1 + 2816 * aux2 + 2815) / 1028522) + aux1 + 1;
-        }
-        var year = ycycle + 2820 * cycle + 474;
-        year = year <= 0 ? year - 1 : year;
-        var yday = jd - this.toJD(year, 1, 1) + 1;
-        var month = yday <= 186 ? Math.ceil(yday / 31) : Math.ceil((yday - 6) / 30);
-        var day = jd - this.toJD(year, month, 1) + 1;
-        return this.newDate(year, month, day);
-      }
-    });
-    function mod(a, b) {
-      return a - b * Math.floor(a / b);
-    }
-    $2.calendars.calendars.persian = PersianCalendar;
-    $2.calendars.calendars.jalali = PersianCalendar;
-  })(jQuery);
-
-  // ../islamic_calendar/islamic_calendar/public/hijri_libary/jquery.calendars.persian-fa.js
-  (function($2) {
-    $2.fn.datepicker.language["fa", "ps"] = {
-      days: ["\u064A\u06A9\u0634\u0646\u0628\u0647", "\u062F\u0648\u0634\u0646\u0628\u0647", "\u0633\u0647\u200C\u0634\u0646\u0628\u0647", "\u0686\u0647\u0627\u0631\u0634\u0646\u0628\u0647", "\u067E\u0646\u062C\u0634\u0646\u0628\u0647", "\u062C\u0645\u0639\u0647", "\u0634\u0646\u0628\u0647"],
-      daysShort: ["\u064A", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
-      daysMin: ["\u064A", "\u062F", "\u0633", "\u0686", "\u067E", "\u062C", "\u0634"],
-      months: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628\u0644\u0647", "\u0645\u06CC\u0632\u0627\u0646", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-      monthsShort: ["\u062D\u0645\u0644", "\u062B\u0648\u0631", "\u062C\u0648\u0632\u0627", "\u0633\u0631\u0637\u0627\u0646", "\u0627\u0633\u062F", "\u0633\u0646\u0628", "\u0645\u06CC\u0632", "\u0639\u0642\u0631\u0628", "\u0642\u0648\u0633", "\u062C\u062F\u06CC", "\u062F\u0644\u0648", "\u062D\u0648\u062A"],
-      today: "\u0627\u0645\u0631\u0648\u0632",
-      clear: "\u067E\u0627\u06A9",
-      dateFormat: "dd.mm.yyyy",
-      timeFormat: "hh:ii",
-      firstDay: 6,
-      isRTL: true
-    };
-  })(jQuery);
-
   // ../islamic_calendar/islamic_calendar/public/js/custom_control_date.js
   var TYPE_DATE = "date";
   var TYPE_DATETIME = "datetime";
@@ -2441,7 +2593,7 @@
   var frappeDateFormatter = frappe.form.formatters.Date;
   var frappeDatetimeFormatter = frappe.form.formatters.Datetime;
   function getISMCalendar() {
-    return $.calendars.instance("persian", "en_US");
+    return $.calendars.instance("iranian", "en_US");
   }
   function ad2ism(m, type, dateFormat = ISM_DATE_FORMAT) {
     if (!m) {
@@ -2945,4 +3097,11 @@
     }
   };
 })();
-//# sourceMappingURL=islamic_assets.bundle.KNEVQCVN.js.map
+/*! Abstract base class for collection plugins v1.0.2.
+	Written by Keith Wood (wood.keith{at}optusnet.com.au) December 2013.
+	Licensed under the MIT license (http://keith-wood.name/licence.html). */
+/*! Simple JavaScript Inheritance
+ * By John Resig http://ejohn.org/
+ * MIT Licensed.
+ */
+//# sourceMappingURL=islamic_assets.bundle.YPPE75UU.js.map
